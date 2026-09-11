@@ -1,0 +1,5 @@
+open_spiel>=1.5
+torch>=2.0
+numpy
+dm-tree
+pytest
