@@ -12,3 +12,8 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m pytest -q
       - run: python -m selfplay_lab.train --episodes 200 --eval-every 200 --eval-games 20 --min-buffer 100 --quiet
+      # The connectome reservoir runs on the committed extract, so this needs no
+      # download. Both a real and a null arm, because the experiment they support
+      # is a comparison and a path that only works for one of them is broken.
+      - run: python -m selfplay_lab.train --features fly --null real --episodes 200 --eval-every 200 --eval-games 20 --min-buffer 100 --quiet
+      - run: python -m selfplay_lab.train --features fly --null rewired --episodes 200 --eval-every 200 --eval-games 20 --min-buffer 100 --quiet
