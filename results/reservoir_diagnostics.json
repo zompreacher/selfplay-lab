@@ -1,0 +1,52 @@
+{
+  "config": {
+    "extract": "/home/user/selfplay-lab/fixtures/connectome/ring_attractor.hemibrain-v1.2.json.gz",
+    "input_dim": 47,
+    "samples": 3000,
+    "seed": 0,
+    "null": "rewired",
+    "out": "results/reservoir_diagnostics.json"
+  },
+  "probes": [
+    {
+      "steps": 1,
+      "gain": 4.0,
+      "linear_r2": 0.8555,
+      "corr_real_vs_rewired": 1.0,
+      "effective_rank": 443,
+      "n_neurons": 449
+    },
+    {
+      "steps": 12,
+      "gain": 4.0,
+      "linear_r2": 0.8441,
+      "corr_real_vs_rewired": 0.9415,
+      "effective_rank": 449,
+      "n_neurons": 449
+    },
+    {
+      "steps": 24,
+      "gain": 4.0,
+      "linear_r2": 0.8338,
+      "corr_real_vs_rewired": 0.8998,
+      "effective_rank": 448,
+      "n_neurons": 449
+    },
+    {
+      "steps": 12,
+      "gain": 8.0,
+      "linear_r2": 0.8342,
+      "corr_real_vs_rewired": 0.8709,
+      "effective_rank": 445,
+      "n_neurons": 449
+    },
+    {
+      "steps": 40,
+      "gain": 8.0,
+      "linear_r2": 0.7809,
+      "corr_real_vs_rewired": 0.7308,
+      "effective_rank": 444,
+      "n_neurons": 449
+    }
+  ]
+}
