@@ -225,3 +225,33 @@ def test_search_agent_refuses_reservoir_features():
                 "--game", "leduc_poker(players=3)",
             ]
         )
+
+
+# --- diagnostics ---------------------------------------------------------------
+
+
+def test_one_step_cannot_distinguish_any_wiring(extract):
+    """At steps=1 the recurrent matrix has been applied zero times.
+
+    So every null must give features identical to the real wiring's. This is the
+    sanity anchor for the diagnostics table: a probe that reported a difference
+    here would be measuring its own noise.
+    """
+    from selfplay_lab.experiments.reservoir_diagnostics import probe
+
+    row = probe(extract, 16, steps=1, gain=4.0, seed=0, samples=200)
+    assert row["corr_real_vs_rewired"] == 1.0
+
+
+def test_recurrence_makes_wiring_matter_more(extract):
+    """More steps must decorrelate real from rewired, or the reservoir is inert.
+
+    If this ever stopped holding, the null experiment would be comparing two
+    things that are the same object, and its result would mean nothing.
+    """
+    from selfplay_lab.experiments.reservoir_diagnostics import probe
+
+    few = probe(extract, 16, steps=4, gain=4.0, seed=0, samples=200)
+    many = probe(extract, 16, steps=32, gain=4.0, seed=0, samples=200)
+    assert many["corr_real_vs_rewired"] < few["corr_real_vs_rewired"]
+
