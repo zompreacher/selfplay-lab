@@ -35,6 +35,8 @@ Usage:
 
 import argparse
 import json
+import math
+import os
 import statistics
 import time
 
@@ -118,12 +120,56 @@ def head_to_head(game, side_a, side_b, games_per_seat, seed_base):
 
 
 def summarise(values):
-    if len(values) < 2:
-        return {"mean": round(float(values[0]), 4), "std": None, "n": len(values)}
-    return {
+    """Mean, spread, and every underlying value.
+
+    The per-seed list is not optional detail. A mean and a standard deviation
+    that cannot be re-derived from the numbers behind them decays into a claim,
+    and with five seeds the individual values carry most of the information
+    about whether a difference is real.
+    """
+    values = [float(v) for v in values]
+    summary = {
         "mean": round(statistics.mean(values), 4),
-        "std": round(statistics.stdev(values), 4),
+        "std": round(statistics.stdev(values), 4) if len(values) > 1 else None,
         "n": len(values),
+        "per_seed": [round(v, 4) for v in values],
+    }
+    if len(values) > 1:
+        summary["sem"] = round(statistics.stdev(values) / math.sqrt(len(values)), 4)
+    return summary
+
+
+def paired_difference(a_values, b_values):
+    """Paired difference with a 95% interval, for arms that share seeds.
+
+    Reported rather than a bare p-value: with n=5 the interval says what the
+    experiment could and could not have detected, which is the part that matters
+    when the answer comes back null.
+    """
+    diffs = [a - b for a, b in zip(a_values, b_values)]
+    n = len(diffs)
+    mean = statistics.mean(diffs)
+    if n < 2:
+        return {"mean": round(mean, 4), "n": n}
+    sd = statistics.stdev(diffs)
+    sem = sd / math.sqrt(n)
+    # Student t, two-tailed, 95%, for small n. Table rather than a dependency on
+    # scipy for four numbers.
+    t_crit = {2: 12.706, 3: 4.303, 4: 3.182, 5: 2.776, 6: 2.571, 7: 2.447,
+              8: 2.365, 9: 2.306, 10: 2.262}.get(n, 1.96)
+    # Smallest true effect this design would detect 80% of the time.
+    t_power = {2: 1.886, 3: 1.638, 4: 1.533, 5: 1.476, 6: 1.440, 7: 1.415,
+               8: 1.397, 9: 1.383, 10: 1.372}.get(n, 1.282)
+    return {
+        "mean": round(mean, 4),
+        "std": round(sd, 4),
+        "sem": round(sem, 4),
+        "ci95": [round(mean - t_crit * sem, 4), round(mean + t_crit * sem, 4)],
+        "t": round(mean / sem, 3) if sem else None,
+        "n": n,
+        "favouring_first": sum(1 for d in diffs if d > 0),
+        "min_detectable_effect_80pct": round((t_crit + t_power) * sem, 4),
+        "per_seed": [round(d, 4) for d in diffs],
     }
 
 
@@ -212,11 +258,14 @@ def main(argv=None):
                 flush=True,
             )
         result["head_to_head_real_vs_rewired"] = {
-            **summarise(paired),
+            **paired_difference(paired, [0.0] * len(paired)),
             "per_seed": [round(x, 4) for x in paired],
-            "seeds_favouring_real": sum(1 for x in paired if x > 0),
             "note": "positive means the measured wiring beat its degree-preserving rewiring",
         }
+        if "real" in arms and "rewired" in arms:
+            result["vs_random_real_minus_rewired"] = paired_difference(
+                vs_random["real"], vs_random["rewired"]
+            )
 
     print("\n=== vs uniform random (mean return, fair line 0) ===")
     for arm in arms:
@@ -226,12 +275,19 @@ def main(argv=None):
     if "head_to_head_real_vs_rewired" in result:
         h = result["head_to_head_real_vs_rewired"]
         print("\n=== head to head: real vs rewired (fair line 0) ===")
-        print(f"  real mean return {h['mean']:+.4f} "
-              f"{'+/- ' + str(h['std']) if h['std'] is not None else ''}")
-        print(f"  seeds favouring real: {h['seeds_favouring_real']}/{len(seeds)}")
+        print(f"  real mean return {h['mean']:+.4f} +/- {h['std']}")
+        print(f"  95% CI [{h['ci95'][0]:+.3f}, {h['ci95'][1]:+.3f}]"
+              f"   {'SPANS ZERO - no detectable effect' if h['ci95'][0] < 0 < h['ci95'][1] else ''}")
+        print(f"  seeds favouring real: {h['favouring_first']}/{len(seeds)}")
+        print(f"  smallest effect this design would reliably detect: "
+              f"{h['min_detectable_effect_80pct']:.2f}")
         print(f"  per seed: {h['per_seed']}")
 
     if args.out:
+        # Create the directory rather than discovering it is missing after the
+        # runs have finished: this experiment costs ~25 minutes of compute and
+        # losing it to a mkdir is an unforced error.
+        os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
         with open(args.out, "w") as handle:
             json.dump(result, handle, indent=2)
         print(f"\nwrote {args.out}")
