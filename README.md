@@ -18,6 +18,7 @@ signs off on what can be released.
 | `selfplay_lab/nfsp_search.py` | **SearchNFSP.** The AlphaZero shape mapped onto NFSP's two heads: in best-response mode the agent runs a net-guided (PUCT prior from the average net), leaf-evaluated (Q head, no rollout) ISMCTS, plays the searched action, and stores the search's normalised visit distribution as the SL label. Dirichlet root noise with alpha derived from the branching factor, not copied from Go. Every knob the arm depends on is asserted at construction so a silent fallback to stock NFSP cannot train a different experiment under this one's name. |
 | `selfplay_lab/train.py` | Minimal trainer: one agent per seat, `--agent {stock,distil,search}`, checkpoint and resume, evaluation on a fixed seed base (common random numbers) so any two checkpoints are scored on the same deals. Reports win rate (fair line 1/N) and mean return (fair line 0). |
 | `selfplay_lab/flybrain/` | **A measured fly connectome as a fixed reservoir.** The Janelia hemibrain central complex - 449 neurons, 63,417 EM-reconstructed connections - placed in front of the agents as a recurrent feature map. The wiring is a buffer, never a parameter: training its measured weights would delete the measurement and leave an ordinarily-initialised RNN with an unusual topology. Per-neuron gain and time constant *are* trainable and default to frozen, because an adjacency table does not measure intrinsic excitability. `nulls.py` holds the controls the whole thing stands on. |
+| `selfplay_lab/stats/` | **The instrument the null results depend on.** Paired-sample statistics for arms that share seeds: a Student-t interval, a percentile bootstrap that assumes only exchangeability, and an exact sign test on the per-seed direction. All three are reported together, because an interval that disagrees with its distribution-free companion is leaning on an assumption the sample size cannot check. Pure stdlib; the t quantile is computed, not read from a table. Partly ported from microsoft/SkillOpt (MIT) - see `docs/SKILLOPT_ASSESSMENT.md`. |
 | `selfplay_lab/experiments/` | `connectome_null.py` runs the measured wiring against its own degree-preserving rewiring; `reservoir_diagnostics.py` measures how much of a difference was available to find in the first place. |
 | `tests/` | Gates, not smoke: affine invariance of the distil target, degenerate-spread fallback, PUCT + visit-count policy asserted on the constructed bot, search calls and net forwards counted, leaf projection matches `num_players`, all three variants train / checkpoint / resume. |
 
@@ -76,12 +77,23 @@ fair line 0:
 | `shuffled_signs` | 2.551 ± 0.605 |
 
 The measured connectome places **fourth of six**, below three of its own null
-models. Paired by seed, `real - rewired` is `-0.090`, 95% CI `[-0.584, +0.404]`,
-2/8 seeds favouring real. Head to head on the same deals, real scores `-0.357`
-against its own rewiring, 95% CI `[-0.919, +0.205]`, 4/8 seeds.
+models. Paired by seed:
 
-Both intervals span zero. **On this task the measured wiring is indistinguishable
-from a random rewiring of itself.**
+| paired comparison | mean | 95% CI (t) | 95% CI (bootstrap) | seeds favouring real | sign test |
+|---|---|---|---|---|---|
+| `real - rewired` vs random | −0.090 | [−0.583, +0.404] | [−0.416, +0.340] | 2 / 8 | p = 0.29 |
+| head to head, same deals | −0.357 | [−0.919, +0.205] | [−0.808, +0.094] | 4 / 8 | p = 1.00 |
+
+Every interval spans zero, under both a parametric and a distribution-free
+estimate. **On this task the measured wiring is indistinguishable from a random
+rewiring of itself.**
+
+Head to head the split is 4 of 8 — not merely "not significant" but exactly what
+the null predicts, at the largest p-value the sign test can return.
+
+The distribution-free columns and a correction to the power calculation came out
+of reading microsoft/SkillOpt; see [`docs/SKILLOPT_ASSESSMENT.md`](docs/SKILLOPT_ASSESSMENT.md)
+for what was taken, what was refused, and the arithmetic that was wrong.
 
 Note that `raw` is not a clean comparison: it is 47-dimensional where the fly arms
 are 449-dimensional into the same network, so it differs in parameter count as
@@ -108,8 +120,11 @@ any learner to exploit, whatever its capacity.
 
 So both halves are the result: the experiment found no effect, *and* it had
 limited power to find one, for a reason that is measured rather than guessed. The
-design would reliably have caught an effect of about 0.9 mean return; smaller
-ones are not ruled out.
+design would have caught an effect of about **0.78** mean return 80% of the time;
+smaller ones are not ruled out. (That figure was first published as 0.89, from a
+power calculation that used the wrong t quantile at the wrong degrees of freedom
+— the correction is in [`docs/SKILLOPT_ASSESSMENT.md`](docs/SKILLOPT_ASSESSMENT.md).
+It erred toward claiming less sensitivity than the design had.)
 
 ### Two things this does not say
 

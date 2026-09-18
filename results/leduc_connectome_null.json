@@ -110,13 +110,28 @@
     "std": 0.6723,
     "sem": 0.2377,
     "ci95": [
-      -0.919,
+      -0.9189,
       0.2053
     ],
     "t": -1.501,
     "n": 8,
     "favouring_first": 4,
-    "min_detectable_effect_80pct": 0.8942,
+    "favouring_second": 4,
+    "sign_test": {
+      "n_nonzero": 8,
+      "p_exact": 1.0,
+      "significant": false
+    },
+    "bootstrap": {
+      "n_boot": 10000,
+      "seed": 42,
+      "ci95": [
+        -0.8083,
+        0.0936
+      ],
+      "mean": -0.3564
+    },
+    "min_detectable_effect_80pct": 0.775,
     "per_seed": [
       0.3233,
       -1.1104,
@@ -130,17 +145,32 @@
     "note": "positive means the measured wiring beat its degree-preserving rewiring"
   },
   "vs_random_real_minus_rewired": {
-    "mean": -0.0897,
-    "std": 0.5907,
+    "mean": -0.0896,
+    "std": 0.5906,
     "sem": 0.2088,
     "ci95": [
-      -0.5835,
+      -0.5834,
       0.4042
     ],
     "t": -0.429,
     "n": 8,
     "favouring_first": 2,
-    "min_detectable_effect_80pct": 0.7856,
+    "favouring_second": 6,
+    "sign_test": {
+      "n_nonzero": 8,
+      "p_exact": 0.2891,
+      "significant": false
+    },
+    "bootstrap": {
+      "n_boot": 10000,
+      "seed": 42,
+      "ci95": [
+        -0.4157,
+        0.3402
+      ],
+      "mean": -0.0911
+    },
+    "min_detectable_effect_80pct": 0.6809,
     "per_seed": [
       1.2283,
       -0.1883,
@@ -151,5 +181,26 @@
       -0.1622,
       -0.4394
     ]
+  },
+  "reanalysis": {
+    "what": "Re-analysed from the stored per-seed differences; no training was re-run.",
+    "why": "The original minimum-detectable-effect used the 0.90 t quantile at df=n for the power term while labelling the result 80% power. Both quantiles take df=n-1, and 80% power takes the 0.80 quantile. The superseded figure therefore overstated how large an effect this design needs, which understated its sensitivity and so was conservative about the null -- but it was still the wrong number.",
+    "added": [
+      "sign_test: distribution-free exact binomial on the seeds favouring each arm",
+      "bootstrap: percentile interval assuming only exchangeability of seeds"
+    ],
+    "corrections": {
+      "head_to_head_real_vs_rewired": {
+        "field": "min_detectable_effect_80pct",
+        "superseded_value": 0.8942,
+        "corrected_value": 0.775
+      },
+      "vs_random_real_minus_rewired": {
+        "field": "min_detectable_effect_80pct",
+        "superseded_value": 0.7856,
+        "corrected_value": 0.6809
+      }
+    },
+    "instrument": "selfplay_lab.stats.paired"
   }
 }
