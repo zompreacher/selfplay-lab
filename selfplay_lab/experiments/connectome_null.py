@@ -46,6 +46,7 @@ from open_spiel.python import rl_environment
 from open_spiel.python.pytorch import nfsp
 
 from .. import train as T
+from ..stats import paired_difference
 
 ARMS = ("raw", "real", "rewired", "shuffled_signs", "shuffled_weights", "random_matched")
 
@@ -137,40 +138,6 @@ def summarise(values):
     if len(values) > 1:
         summary["sem"] = round(statistics.stdev(values) / math.sqrt(len(values)), 4)
     return summary
-
-
-def paired_difference(a_values, b_values):
-    """Paired difference with a 95% interval, for arms that share seeds.
-
-    Reported rather than a bare p-value: with n=5 the interval says what the
-    experiment could and could not have detected, which is the part that matters
-    when the answer comes back null.
-    """
-    diffs = [a - b for a, b in zip(a_values, b_values)]
-    n = len(diffs)
-    mean = statistics.mean(diffs)
-    if n < 2:
-        return {"mean": round(mean, 4), "n": n}
-    sd = statistics.stdev(diffs)
-    sem = sd / math.sqrt(n)
-    # Student t, two-tailed, 95%, for small n. Table rather than a dependency on
-    # scipy for four numbers.
-    t_crit = {2: 12.706, 3: 4.303, 4: 3.182, 5: 2.776, 6: 2.571, 7: 2.447,
-              8: 2.365, 9: 2.306, 10: 2.262}.get(n, 1.96)
-    # Smallest true effect this design would detect 80% of the time.
-    t_power = {2: 1.886, 3: 1.638, 4: 1.533, 5: 1.476, 6: 1.440, 7: 1.415,
-               8: 1.397, 9: 1.383, 10: 1.372}.get(n, 1.282)
-    return {
-        "mean": round(mean, 4),
-        "std": round(sd, 4),
-        "sem": round(sem, 4),
-        "ci95": [round(mean - t_crit * sem, 4), round(mean + t_crit * sem, 4)],
-        "t": round(mean / sem, 3) if sem else None,
-        "n": n,
-        "favouring_first": sum(1 for d in diffs if d > 0),
-        "min_detectable_effect_80pct": round((t_crit + t_power) * sem, 4),
-        "per_seed": [round(d, 4) for d in diffs],
-    }
 
 
 def main(argv=None):
@@ -276,10 +243,21 @@ def main(argv=None):
         h = result["head_to_head_real_vs_rewired"]
         print("\n=== head to head: real vs rewired (fair line 0) ===")
         print(f"  real mean return {h['mean']:+.4f} +/- {h['std']}")
-        print(f"  95% CI [{h['ci95'][0]:+.3f}, {h['ci95'][1]:+.3f}]"
+        print(f"  95% CI  (t)         [{h['ci95'][0]:+.3f}, {h['ci95'][1]:+.3f}]"
               f"   {'SPANS ZERO - no detectable effect' if h['ci95'][0] < 0 < h['ci95'][1] else ''}")
-        print(f"  seeds favouring real: {h['favouring_first']}/{len(seeds)}")
-        print(f"  smallest effect this design would reliably detect: "
+        b = h["bootstrap"]["ci95"]
+        # Printed next to the t interval, not instead of it: if the two disagree
+        # the t interval was leaning on a normality assumption n=8 cannot check.
+        print(f"  95% CI  (bootstrap) [{b[0]:+.3f}, {b[1]:+.3f}]"
+              f"   {'SPANS ZERO' if b[0] < 0 < b[1] else ''}")
+        # Stated as a fact, not turned into a verdict. Which interval to believe
+        # when they disagree is a judgement the reader makes with the n in hand.
+        if (h["ci95"][0] < 0 < h["ci95"][1]) != (b[0] < 0 < b[1]):
+            print("  NOTE: the two intervals disagree on whether zero is excluded.")
+        st = h["sign_test"]
+        print(f"  seeds favouring real: {h['favouring_first']}/{len(seeds)}"
+              f"   (sign test, exact p = {st['p_exact']})")
+        print(f"  smallest effect this design would detect 80% of the time: "
               f"{h['min_detectable_effect_80pct']:.2f}")
         print(f"  per seed: {h['per_seed']}")
 
